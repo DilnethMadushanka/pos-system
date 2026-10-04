@@ -1,8 +1,7 @@
 import { ChartBar } from '@phosphor-icons/react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo, useState } from 'react'
 import { Badge, EmptyState, PageHeader } from '../components/ui'
-import { db } from '../db'
+import { useProducts, useSales } from '../lib/data'
 import { money, startOfDay } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { useSettings } from '../lib/useSettings'
@@ -29,11 +28,10 @@ export default function Reports() {
   const [range, setRange] = useState('7')
   const m = (n: number) => money(n, settings.currency)
 
-  const sales = useLiveQuery(async () => {
-    const from = rangeStart(range)
-    return (await db.sales.where('createdAt').aboveOrEqual(from).toArray()).filter((s) => s.status === 'paid')
-  }, [range])
-  const products = useLiveQuery(() => db.products.toArray(), [])
+  const from = useMemo(() => rangeStart(range), [range])
+  const allSales = useSales(from)
+  const sales = useMemo(() => allSales?.filter((s) => s.status === 'paid'), [allSales])
+  const products = useProducts()
 
   const report = useMemo(() => {
     const list = sales ?? []

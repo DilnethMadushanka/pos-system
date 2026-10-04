@@ -224,4 +224,40 @@ export const si: Record<string, string> = {
   'New PIN': 'නව PIN අංකය',
   '{n} digits': 'ඉලක්කම් {n}',
   'Repeat the PIN': 'PIN අංකය නැවත ඇතුළත් කරන්න',
+
+  // Account and sync
+  '{name} no longer exists': '{name} තවදුරටත් නොපවතී',
+  'You need to be online to do this.': 'මෙය කිරීමට අන්තර්ජාලයට සම්බන්ධ විය යුතුය.',
+  'This file is not a Kade POS backup': 'මෙය Kade POS backup ගොනුවක් නොවේ',
+  'Could not erase the data': 'දත්ත මකා දැමිය නොහැකි විය',
+  'Account': 'ගිණුම',
+  'Signed in as {email}. Every device signed in with this account shares the same shop.':
+    '{email} ලෙස පිවිසී ඇත. මෙම ගිණුමෙන් පිවිසි සියලු උපාංග එකම සාප්පුව බෙදා ගනී.',
+  'Sign out': 'පිටවන්න',
+  'Connect to the internet before signing out, so your latest sales are saved.':
+    'ඔබගේ නවතම විකුණුම් සුරැකීමට, පිටවීමට පෙර අන්තර්ජාලයට සම්බන්ධ වන්න.',
+  'Could not sign out. Please try again.': 'පිටවිය නොහැකි විය. නැවත උත්සාහ කරන්න.',
+  'Your data is saved to your cloud account and kept on this device for offline use. Download a backup now and then and keep it somewhere safe.':
+    'ඔබගේ දත්ත cloud ගිණුමේ සුරැකෙන අතර, අන්තර්ජාලය නොමැතිව භාවිතයට මෙම උපාංගයේත් තබා ගනී. වරින් වර backup එකක් බාගත කර ආරක්ෂිතව තබා ගන්න.',
+  'Could not save to the cloud. Check your connection and try again.':
+    'Cloud එකට සුරැකීමට නොහැකි විය. සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.',
+  'You are offline. Sales are saved on this device and will sync when the connection returns.':
+    'ඔබ අන්තර්ජාලයෙන් බැහැරයි. විකුණුම් මෙම උපාංගයේ සුරැකෙන අතර සම්බන්ධතාව ලැබූ විට sync වේ.',
+  'Wrong email or password.': 'ඊමේල් හෝ මුරපදය වැරදියි.',
+  'An account with this email already exists. Sign in instead.': 'මෙම ඊමේල් ලිපිනයෙන් ගිණුමක් දැනටමත් ඇත. පිවිසෙන්න.',
+  'Use a password with at least 6 characters.': 'අවම වශයෙන් අක්ෂර 6ක මුරපදයක් භාවිතා කරන්න.',
+  'No internet connection. Connect once to sign in.': 'අන්තර්ජාලය නැත. පිවිසීමට එක් වරක් සම්බන්ධ වන්න.',
+  'Too many attempts. Try again in a few minutes.': 'උත්සාහ කිරීම් වැඩියි. විනාඩි කිහිපයකින් නැවත උත්සාහ කරන්න.',
+  'Could not sign in. Please try again.': 'පිවිසිය නොහැකි විය. නැවත උත්සාහ කරන්න.',
+  'Enter your email first.': 'මුලින් ඔබගේ ඊමේල් ලිපිනය ඇතුළත් කරන්න.',
+  'If that email has an account, a reset link is on its way.': 'එම ඊමේල් ලිපිනයට ගිණුමක් ඇත්නම්, මුරපදය යළි සැකසීමේ සබැඳියක් එවා ඇත.',
+  'Sign in to your shop': 'ඔබගේ සාප්පුවට පිවිසෙන්න',
+  'Create your shop account': 'ඔබගේ සාප්පු ගිණුම සාදන්න',
+  Email: 'ඊමේල්',
+  Password: 'මුරපදය',
+  'Sign in': 'පිවිසෙන්න',
+  'Create account': 'ගිණුම සාදන්න',
+  'New shop? Create an account': 'අලුත් සාප්පුවක්ද? ගිණුමක් සාදන්න',
+  'Already have an account? Sign in': 'දැනටමත් ගිණුමක් තිබේද? පිවිසෙන්න',
+  'Forgot password?': 'මුරපදය අමතකද?',
 }

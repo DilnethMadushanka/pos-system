@@ -1,8 +1,11 @@
-import { DownloadSimple, LockSimple, UploadSimple } from '@phosphor-icons/react'
+import { DownloadSimple, LockSimple, SignOut, UploadSimple } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { PIN_LENGTH } from '../components/PinScreen'
 import { Button, ConfirmDialog, Field, Input, Modal, PageHeader, Select, useToast } from '../components/ui'
-import { clearAllData, exportBackup, importBackup, saveSettings, type Settings } from '../db'
+import type { Settings } from '../model'
+import { AppError } from '../lib/actions'
+import { useAccount } from '../lib/account'
+import { useActions } from '../lib/data'
 import { useAuth } from '../lib/auth'
 import { downloadFile } from '../lib/format'
 import { useT } from '../lib/i18n'
@@ -13,6 +16,8 @@ export default function SettingsPage() {
   const toast = useToast()
   const t = useT()
   const { hasPin, lock, removePin } = useAuth()
+  const actions = useActions()
+  const { user, signOut } = useAccount()
   const [form, setForm] = useState(current)
   const [dirty, setDirty] = useState(false)
   const [taxText, setTaxText] = useState(String(current.taxRate))
@@ -37,7 +42,7 @@ export default function SettingsPage() {
   const save = async () => {
     // PIN, receipt counter and the other managed fields are written by their own actions.
     const { shopName, address, phone, currency, taxInclusive, receiptFooter, theme, language } = form
-    await saveSettings({
+    actions.saveSettings({
       shopName,
       address,
       phone,
@@ -54,7 +59,7 @@ export default function SettingsPage() {
 
   const backup = async () => {
     const stamp = new Date().toISOString().slice(0, 10)
-    downloadFile(`kade-pos-backup-${stamp}.json`, await exportBackup(), 'application/json')
+    downloadFile(`kade-pos-backup-${stamp}.json`, await actions.exportBackup(), 'application/json')
   }
 
   return (
@@ -158,10 +163,37 @@ export default function SettingsPage() {
         </section>
 
         <section className="flex flex-col gap-4 border-t border-line pt-8">
+          <h2 className="text-base font-semibold tracking-tight">{t('Account')}</h2>
+          <p className="-mt-2 text-sm leading-relaxed text-muted">
+            {t('Signed in as {email}. Every device signed in with this account shares the same shop.', {
+              email: user.email ?? '',
+            })}
+          </p>
+          <div>
+            <Button
+              onClick={async () => {
+                if (!navigator.onLine) {
+                  toast(t('Connect to the internet before signing out, so your latest sales are saved.'), 'error')
+                  return
+                }
+                try {
+                  await signOut()
+                } catch {
+                  toast(t('Could not sign out. Please try again.'), 'error')
+                }
+              }}
+            >
+              <SignOut size={18} weight="bold" />
+              {t('Sign out')}
+            </Button>
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-4 border-t border-line pt-8">
           <h2 className="text-base font-semibold tracking-tight">{t('Your data')}</h2>
           <p className="-mt-2 text-sm leading-relaxed text-muted">
             {t(
-              'Everything is stored on this device only. Download a backup regularly and keep it somewhere safe, for example on a USB drive or in your email.',
+              'Your data is saved to your cloud account and kept on this device for offline use. Download a backup now and then and keep it somewhere safe.',
             )}
           </p>
           <input
@@ -219,11 +251,11 @@ export default function SettingsPage() {
           onCancel={() => setPendingRestore(null)}
           onConfirm={async () => {
             try {
-              await importBackup(pendingRestore)
+              await actions.importBackup(pendingRestore)
               setDirty(false)
               toast(t('Backup restored'))
             } catch (e) {
-              toast(e instanceof Error ? e.message : t('Could not restore this file'), 'error')
+              toast(e instanceof AppError ? t(e.key, e.vars) : t('Could not restore this file'), 'error')
             }
             setPendingRestore(null)
           }}
@@ -240,10 +272,14 @@ export default function SettingsPage() {
           danger
           onCancel={() => setConfirmClear(false)}
           onConfirm={async () => {
-            await clearAllData()
-            setDirty(false)
+            try {
+              await actions.clearAllData()
+              setDirty(false)
+              toast(t('All data erased'))
+            } catch (e) {
+              toast(e instanceof AppError ? t(e.key, e.vars) : t('Could not erase the data'), 'error')
+            }
             setConfirmClear(false)
-            toast(t('All data erased'))
           }}
         />
       )}

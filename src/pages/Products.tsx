@@ -7,7 +7,6 @@ import {
   UploadSimple,
   Cube,
 } from '@phosphor-icons/react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo, useRef, useState } from 'react'
 import {
   Badge,
@@ -21,13 +20,14 @@ import {
   Select,
   useToast,
 } from '../components/ui'
-import { db, loadSampleProducts, type Product } from '../db'
+import { sampleProducts, type Product } from '../model'
+import { useActions, useProducts } from '../lib/data'
 import { csvEscape, downloadFile, money, parseCsv } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { useSettings } from '../lib/useSettings'
 
 type Draft = {
-  id?: number
+  id?: string
   name: string
   sku: string
   category: string
@@ -65,7 +65,8 @@ export default function Products() {
   const settings = useSettings()
   const toast = useToast()
   const t = useT()
-  const products = useLiveQuery(() => db.products.orderBy('name').toArray(), [])
+  const products = useProducts()
+  const actions = useActions()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('All')
   const [lowOnly, setLowOnly] = useState(false)
@@ -105,9 +106,9 @@ export default function Products() {
     try {
       const rows = parseCsv(await file.text())
       if (rows.length && Number.isNaN(parseFloat(rows[0][3]))) rows.shift()
-      const existing = await db.products.toArray()
-      let added = 0
-      let updated = 0
+      const bySku = new Map(products.filter((p) => p.sku).map((p) => [p.sku, p.id]))
+      const toAdd: Omit<Product, 'id'>[] = []
+      const toUpdate: { id: string; data: Partial<Omit<Product, 'id'>> }[] = []
       for (const [name, sku = '', category = '', price = '0', cost = '0', stock = '0'] of rows) {
         if (!name?.trim()) continue
         const data = {
@@ -118,16 +119,13 @@ export default function Products() {
           cost: parseFloat(cost) || 0,
           stock: parseInt(stock, 10) || 0,
         }
-        const match = data.sku ? existing.find((p) => p.sku === data.sku) : undefined
-        if (match) {
-          await db.products.update(match.id, data)
-          updated++
-        } else {
-          await db.products.add({ ...data, lowStock: 5, trackStock: true } as Product)
-          added++
-        }
+        const matchId = data.sku ? bySku.get(data.sku) : undefined
+        if (matchId) toUpdate.push({ id: matchId, data })
+        else toAdd.push({ ...data, lowStock: 5, trackStock: true })
       }
-      toast(t('Imported {added} new, updated {updated}', { added, updated }))
+      actions.addProducts(toAdd)
+      actions.updateProducts(toUpdate)
+      toast(t('Imported {added} new, updated {updated}', { added: toAdd.length, updated: toUpdate.length }))
     } catch {
       toast(t('Could not read that file'), 'error')
     }
@@ -197,13 +195,7 @@ export default function Products() {
         </div>
 
         <div className="overflow-hidden rounded-lg border border-line bg-panel">
-          {products === undefined ? (
-            <div className="flex flex-col gap-px">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-16 animate-pulse bg-raised" />
-              ))}
-            </div>
-          ) : products.length === 0 ? (
+          {products.length === 0 ? (
             <EmptyState
               icon={<Cube size={24} />}
               title={t('Your product list is empty')}
@@ -214,8 +206,8 @@ export default function Products() {
                     {t('Add product')}
                   </Button>
                   <Button
-                    onClick={async () => {
-                      await loadSampleProducts()
+                    onClick={() => {
+                      actions.addProducts(sampleProducts)
                       toast(t('Sample products added'))
                     }}
                   >
@@ -293,8 +285,8 @@ export default function Products() {
           confirmLabel={t('Delete')}
           danger
           onCancel={() => setDeleting(null)}
-          onConfirm={async () => {
-            await db.products.delete(deleting.id)
+          onConfirm={() => {
+            actions.deleteProduct(deleting.id)
             setDeleting(null)
             toast(t('Product deleted'))
           }}
@@ -315,17 +307,19 @@ function ProductForm({
 }) {
   const toast = useToast()
   const t = useT()
+  const products = useProducts()
+  const actions = useActions()
   const [d, setD] = useState(draft)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((prev) => ({ ...prev, [k]: v }))
 
-  const save = async () => {
+  const save = () => {
     const err: Record<string, string> = {}
     if (!d.name.trim()) err.name = t('Enter a product name')
     const price = parseFloat(d.price)
     if (Number.isNaN(price) || price < 0) err.price = t('Enter a selling price')
     if (d.sku.trim()) {
-      const clash = await db.products.where('sku').equals(d.sku.trim()).first()
+      const clash = products.find((p) => p.sku === d.sku.trim())
       if (clash && clash.id !== d.id) err.sku = t('Already used by "{name}"', { name: clash.name })
     }
     setErrors(err)
@@ -341,8 +335,7 @@ function ProductForm({
       lowStock: parseInt(d.lowStock, 10) || 0,
       trackStock: d.trackStock,
     }
-    if (d.id) await db.products.update(d.id, data)
-    else await db.products.add(data as Product)
+    actions.saveProduct(data, d.id)
     toast(t(d.id ? 'Product updated' : 'Product added'))
     onClose()
   }

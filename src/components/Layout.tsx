@@ -1,8 +1,12 @@
 import { ChartBar, Cube, GearSix, LockSimple, LockSimpleOpen, Receipt, Storefront } from '@phosphor-icons/react'
+import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { ERROR_EVENT } from '../lib/actions'
 import { useAuth } from '../lib/auth'
+import { useOnline } from '../lib/data'
 import { useT } from '../lib/i18n'
 import { useSettings } from '../lib/useSettings'
+import { useToast } from './ui'
 
 const nav = [
   { to: '/', label: 'Sell', icon: Storefront, owner: false },
@@ -16,6 +20,14 @@ export default function Layout() {
   const { shopName } = useSettings()
   const { hasPin, unlocked, lock } = useAuth()
   const t = useT()
+  const toast = useToast()
+  const online = useOnline()
+
+  useEffect(() => {
+    const onError = () => toast(t('Could not save to the cloud. Check your connection and try again.'), 'error')
+    window.addEventListener(ERROR_EVENT, onError)
+    return () => window.removeEventListener(ERROR_EVENT, onError)
+  }, [toast, t])
 
   return (
     <div className="flex h-full flex-col md:flex-row">
@@ -62,9 +74,16 @@ export default function Layout() {
         )}
       </aside>
 
-      <main className="min-h-0 flex-1 overflow-hidden">
-        <Outlet />
-      </main>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {!online && (
+          <div role="status" className="bg-warn-soft px-4 py-2 text-sm text-warn-soft-ink">
+            {t('You are offline. Sales are saved on this device and will sync when the connection returns.')}
+          </div>
+        )}
+        <main className="min-h-0 flex-1 overflow-hidden">
+          <Outlet />
+        </main>
+      </div>
 
       <nav className="grid shrink-0 grid-cols-5 border-t border-line bg-panel pb-[env(safe-area-inset-bottom)] md:hidden">
         {nav.map(({ to, label, icon: Icon }) => (

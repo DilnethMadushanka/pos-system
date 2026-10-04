@@ -1,4 +1,4 @@
-import type { Sale, Settings } from '../db'
+import type { Sale, Settings } from '../model'
 import { dateTime, money } from '../lib/format'
 import { useT } from '../lib/i18n'
 

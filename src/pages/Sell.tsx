@@ -12,22 +12,21 @@ import {
   ShoppingCartSimple,
   Trash,
 } from '@phosphor-icons/react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Receipt from '../components/Receipt'
 import { Badge, Button, EmptyState, Field, Input, Modal, useToast } from '../components/ui'
+import { AppError } from '../lib/actions'
+import { useActions, useHeld, useProducts } from '../lib/data'
 import {
   calcTotals,
-  createSale,
-  db,
-  loadSampleProducts,
+  sampleProducts,
   type HeldSale,
   type PaymentMethod,
   type Product,
   type Sale,
   type SaleLine,
-} from '../db'
+} from '../model'
 import { money, timeOnly } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { useSettings } from '../lib/useSettings'
@@ -38,8 +37,9 @@ export default function Sell() {
   const settings = useSettings()
   const toast = useToast()
   const t = useT()
-  const products = useLiveQuery(() => db.products.orderBy('name').toArray(), [])
-  const heldSales = useLiveQuery(() => db.held.orderBy('createdAt').reverse().toArray(), [])
+  const products = useProducts()
+  const heldSales = useHeld()
+  const actions = useActions()
 
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('All')
@@ -74,7 +74,7 @@ export default function Sell() {
   }, [products, query, category])
 
   const stockOf = useCallback(
-    (productId: number) => products?.find((p) => p.id === productId),
+    (productId: string) => products?.find((p) => p.id === productId),
     [products],
   )
 
@@ -94,7 +94,7 @@ export default function Sell() {
     [lines, toast, t],
   )
 
-  const setQty = (productId: number, qty: number) => {
+  const setQty = (productId: string, qty: number) => {
     const p = stockOf(productId)
     let next = Math.max(1, Math.floor(qty) || 1)
     if (p?.trackStock && next > p.stock) {
@@ -104,7 +104,7 @@ export default function Sell() {
     setLines((prev) => prev.map((l) => (l.productId === productId ? { ...l, qty: next } : l)))
   }
 
-  const removeLine = (productId: number) => setLines((prev) => prev.filter((l) => l.productId !== productId))
+  const removeLine = (productId: string) => setLines((prev) => prev.filter((l) => l.productId !== productId))
 
   const clearCart = () => {
     setLines([])
@@ -126,24 +126,19 @@ export default function Sell() {
     }
   }
 
-  const holdSale = async () => {
+  const holdSale = () => {
     if (!lines.length) return
-    await db.held.add({
-      createdAt: Date.now(),
-      lines,
-      discount: parseFloat(discountInput) || 0,
-      discountMode,
-    } as HeldSale)
+    actions.holdSale(lines, parseFloat(discountInput) || 0, discountMode)
     clearCart()
     setCartOpen(false)
     toast(t('Sale put on hold'))
   }
 
-  const resumeHeld = async (h: HeldSale) => {
+  const resumeHeld = (h: HeldSale) => {
     setLines(h.lines)
     setDiscountInput(h.discount ? String(h.discount) : '')
     setDiscountMode(h.discountMode)
-    await db.held.delete(h.id)
+    actions.deleteHeld(h.id)
     setHeldOpen(false)
   }
 
@@ -231,13 +226,7 @@ export default function Sell() {
         </div>
 
         <div className="scroll-thin min-h-0 flex-1 overflow-y-auto p-4">
-          {products === undefined ? (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="h-24 animate-pulse rounded-lg bg-raised" />
-              ))}
-            </div>
-          ) : products.length === 0 ? (
+          {products.length === 0 ? (
             <EmptyState
               icon={<Cube size={24} />}
               title={t('No products yet')}
@@ -251,8 +240,8 @@ export default function Sell() {
                     {t('Add products')}
                   </Link>
                   <Button
-                    onClick={async () => {
-                      await loadSampleProducts()
+                    onClick={() => {
+                      actions.addProducts(sampleProducts)
                       toast(t('Sample products added'))
                     }}
                   >
@@ -332,7 +321,7 @@ export default function Sell() {
           currency={settings.currency}
           onClose={() => setPayOpen(false)}
           onPay={async (method, tendered) => {
-            const sale = await createSale({ lines, totals, method, tendered })
+            const sale = actions.createSale({ lines, totals, method, tendered }, products)
             setPayOpen(false)
             setCartOpen(false)
             clearCart()
@@ -410,7 +399,7 @@ export default function Sell() {
                         <Play size={16} weight="fill" />
                         {t('Resume')}
                       </Button>
-                      <Button variant="ghost" aria-label={t('Delete held sale')} onClick={() => db.held.delete(h.id)}>
+                      <Button variant="ghost" aria-label={t('Delete held sale')} onClick={() => actions.deleteHeld(h.id)}>
                         <Trash size={18} />
                       </Button>
                     </div>
@@ -436,8 +425,8 @@ interface CartProps {
   discountMode: DiscountMode
   onDiscountInput: (v: string) => void
   onDiscountMode: (m: DiscountMode) => void
-  onQty: (productId: number, qty: number) => void
-  onRemove: (productId: number) => void
+  onQty: (productId: string, qty: number) => void
+  onRemove: (productId: string) => void
   onClear: () => void
   onHold: () => void
   onPay: () => void
@@ -618,7 +607,7 @@ function PaymentModal({
     try {
       await onPay(method, method === 'cash' ? given : total)
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('Could not complete the sale'))
+      setError(e instanceof AppError ? t(e.key, e.vars) : t('Could not complete the sale'))
       setBusy(false)
     }
   }

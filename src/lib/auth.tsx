@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { saveSettings } from '../db'
+import { useActions } from './data'
 import { useSettings } from './useSettings'
 
 const IDLE_MS = 5 * 60 * 1000
@@ -63,6 +63,7 @@ const Ctx = createContext<AuthValue>({
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { pinHash, pinSalt } = useSettings()
+  const actions = useActions()
   const hasPin = pinHash !== ''
   const [owner, setOwner] = useState(false)
   const idle = useRef<number | undefined>(undefined)
@@ -92,14 +93,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setPin = useCallback(async (pin: string) => {
     const salt = crypto.randomUUID?.() ?? String(Math.random()).slice(2)
-    await saveSettings({ pinSalt: salt, pinHash: await hashPin(pin, salt) })
+    actions.saveSettings({ pinSalt: salt, pinHash: await hashPin(pin, salt) })
     setOwner(true)
-  }, [])
+  }, [actions])
 
   const removePin = useCallback(async () => {
-    await saveSettings({ pinSalt: '', pinHash: '' })
+    actions.saveSettings({ pinSalt: '', pinHash: '' })
     setOwner(false)
-  }, [])
+  }, [actions])
 
   const unlocked = !hasPin || owner
 

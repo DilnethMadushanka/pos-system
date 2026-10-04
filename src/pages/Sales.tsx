@@ -1,9 +1,9 @@
 import { Printer, Receipt as ReceiptIcon } from '@phosphor-icons/react'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Receipt from '../components/Receipt'
 import { Badge, Button, ConfirmDialog, EmptyState, Modal, PageHeader, useToast } from '../components/ui'
-import { db, voidSale, type Sale } from '../db'
+import type { Sale } from '../model'
+import { useActions, useProducts, useSales } from '../lib/data'
 import { dateTime, money, startOfDay } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { useAuth } from '../lib/auth'
@@ -23,18 +23,18 @@ export default function Sales() {
   const t = useT()
   const { hasPin, unlocked } = useAuth()
   const methodLabel = { cash: t('Cash'), card: t('Card'), transfer: t('Transfer') }
+  const actions = useActions()
+  const products = useProducts()
   const [range, setRange] = useState('today')
   const [open, setOpen] = useState<Sale | null>(null)
   const [confirmVoid, setConfirmVoid] = useState(false)
   const m = (n: number) => money(n, settings.currency)
 
-  const sales = useLiveQuery(async () => {
+  const from = useMemo(() => {
     const r = ranges.find((x) => x.id === range)!
-    const all = await db.sales.orderBy('createdAt').reverse().toArray()
-    if (r.days < 0) return all
-    const from = startOfDay(Date.now()) - r.days * 86_400_000
-    return all.filter((s) => s.createdAt >= from)
+    return r.days < 0 ? null : startOfDay(Date.now()) - r.days * 86_400_000
   }, [range])
+  const sales = useSales(from)
 
   const paid = (sales ?? []).filter((s) => s.status === 'paid')
   const revenue = paid.reduce((sum, s) => sum + s.total, 0)
@@ -138,8 +138,8 @@ export default function Sales() {
           confirmLabel={t('Void sale')}
           danger
           onCancel={() => setConfirmVoid(false)}
-          onConfirm={async () => {
-            await voidSale(open.id)
+          onConfirm={() => {
+            actions.voidSale(open, products)
             setConfirmVoid(false)
             setOpen(null)
             toast(t('Sale voided'))
